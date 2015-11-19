@@ -1,4 +1,3 @@
-
 var http = require('http').Server;
 var io = require('..');
 var fs = require('fs');
@@ -415,8 +414,8 @@ describe('socket.io', function(){
   });
 
   describe('namespaces', function(){
-    var Socket = require('../lib/socket');
-    var Namespace = require('../lib/namespace');
+    var Socket = require('../dist/socket');
+    var Namespace = require('../dist/namespace');
 
     it('should be accessible through .sockets', function(){
       var sio = io();
@@ -1625,7 +1624,7 @@ describe('socket.io', function(){
         var socket = client(srv);
         sio.on('connection', function(s){
           s.conn.on('upgrade', function(){
-            console.log('\033[96mNote: warning expected and normal in test.\033[39m');
+            console.log('Note: warning expected and normal in test.');
             socket.io.engine.write('5woooot');
             setTimeout(function(){
               done();
@@ -1993,7 +1992,7 @@ describe('socket.io', function(){
   });
 
   describe('middleware', function(done){
-    var Socket = require('../lib/socket');
+    var Socket = require('../dist/socket');
 
     it('should call functions', function(done){
       var srv = http();
