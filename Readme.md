@@ -59,6 +59,163 @@ io.on('connection', function(){ /* … */ });
 server.listen(3000);
 ```
 
+### Sending and receiving events
+
+#### Server
+```js
+var io = require('socket.io')();
+io.on('connection', function(socket){
+  // send a message to the given socket
+  socket.emit('a simple message', 'hi!');
+  // send several types of data (including binary)
+  var buf = new Buffer('abcdefg', 'utf8');
+  socket.emit('a slightly more complex message', 1, '2', [3, 4], buf,{ 5: buf, 6: '7' });
+  // send a message to all but the given socket
+  socket.broadcast.emit('a message to others', 'someone has connected');
+  // send a message to the given socket, if it is currently connected (if not, drop it)
+  // (by default, if the socket is not ready to receive messages -- because of network
+  // slowness or other issues -- the packets will be queued)
+  socket.volatile.emit('a volatile message', 'you may receive it, or not');
+  // send a message to the given socket without compression (enabled by default)
+  socket.compress(false).emit('an uncompressed message', 'don\'t bother to compress');
+  // send a message to all connected sockets
+  io.emit('to all', 'hi all');
+  // send a message to the given socket with an acknowledgement callback
+  socket.emit('a simple message with callback', 'hope you get it', function(data){
+    console.log('[a simple message with callback] ' + data);
+  });
+  // listen to the given socket
+  socket.on('private message', function(data){
+    console.log('[private message] ' + data);
+  });
+  // listen to the given socket and acknowledge the reception
+  socket.on('private message with callback', function(data, callback){
+    console.log('[private message with callback] ' + data);
+    callback('got it!');
+  });
+  // reserved events
+  socket.on('error', function(err){
+    console.error(err);
+  });
+  socket.on('disconnect', function(){
+    io.emit('to all', 'someone has disconnected');
+  });
+});
+io.listen(3000);
+
+```
+
+#### Client
+```js
+var socket = require('socket.io-client')('http://localhost:3000');
+// in the browser, it would be
+// <script src="/socket.io/socket.io.js"></script>
+// <script>
+// var socket = io('http://localhost:3000');
+// </script>
+socket.on('connect', function(){
+  console.log('[event] connected');
+  socket.emit('private message', 'hoy!');
+  socket.emit('private message with callback', 'please answer', function(data){
+    console.log('[private message with callback] ' + data);
+  });
+});
+socket.on('a simple message', function(data){
+  console.log('[a simple message] ' + data);
+});
+socket.on('a slightly more complex message', function(){
+  console.log('[a slightly more complex message]');
+  console.log(arguments);
+});
+socket.on('a message to others', function(data){
+  console.log('[a message to others] ' + data);
+});
+socket.on('to all', function(data){
+  console.log('[to all] ' + data);
+});
+socket.on('a simple message with callback', function(data, callback){
+  console.log('[a simple message with callback] ' + data);
+  callback('got it!');
+});
+// reserved events
+socket.on('error', function(err){
+  console.error(err);
+});
+socket.on('disconnect', function(){
+  console.log('[event] disconnected');
+});
+```
+
+### Using namespaces
+
+If you have control over all the messages and events emitted for a particular application, using the default / namespace works. If you want to leverage 3rd-party code, or produce code to share with others, socket.io provides a way of namespacing a socket.
+
+This has the benefit of `multiplexing` a single connection. Instead of socket.io using two WebSocket connections, it’ll use one.
+
+#### Server
+```js
+var io = require('socket.io')();
+var nsp1 = io.of('/nsp1').on('connection', function(socket){
+  socket.emit('a simple message', 'hi from nsp1');
+  nsp1.emit('to all', 'hi all (in nsp1)');
+});
+var nsp2 = io.of('/nsp2').on('connection', function(socket){
+  socket.emit('a simple message', 'hi from nsp2');
+});
+io.listen(3000);
+```
+
+#### Client
+```js
+var socket1 = require('socket.io-client')('http://localhost:3000/nsp1');
+var socket2 = require('socket.io-client')('http://localhost:3000/nsp2');
+
+socket1.on('connect', function(){
+  console.log('[event] connected in nsp1');
+});
+socket1.on('a simple message', function(data){
+  console.log('[a simple message] ' + data);
+});
+socket1.on('to all', function(data){
+  console.log('[to all] ' + data);
+});
+socket2.on('connect', function(){
+  console.log('[event] connected in nsp2');
+});
+socket2.on('a simple message', function(data){
+  console.log('[a simple message] ' + data);
+});
+```
+
+### Using rooms
+
+Within each namespace, you can also define arbitrary channels that sockets can `join` and `leave`.
+
+#### Server
+```js
+var io = require('socket.io')();
+io.on('connection', function(socket){
+  // join a given room
+  socket.join('room1', function(){
+    // send a message to the sockets in the given room (except the current one)
+    socket.to('room1').emit('a simple message', 'someone has joined the room');
+  });
+  setTimeout(function(){
+    // leave the room
+    socket.leave('room1', function(){
+      socket.to('room1').emit('a simple message', 'someone has left the room');
+    });
+  }, 2000);
+  // also, each socket joins a room named after its id
+  for (var socketId in io.of('/').connected /* or io.sockets.connected */){
+    if (socket.id != socketId){
+      socket.to(socketId).emit('a simple message', 'private message');
+    }
+  }
+});
+io.listen(3000);
+```
+
 ## API
 
 ### Server
